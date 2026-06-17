@@ -20,8 +20,7 @@ from se3dif.utils import to_numpy, to_torch, get_grasps_src
 # from mesh_to_sdf.surface_point_cloud import get_scan_view, get_hq_scan_view
 # from mesh_to_sdf.scan import ScanPointcloud
 from tqdm import tqdm
-
-from icecream import ic#!!
+from icecream import ic
 
 
 import os, sys
@@ -69,7 +68,7 @@ class DG16MGrasps:
         self.labels = self.labels[perm]
         return grasps
         
-    #----TODO: need to add reachability labels similar to fc (force closure passing/failed) 
+
     def load_grasps(self, data):
         grasps = data['grasps/grasps'][()]
         if self.single_arm:
@@ -79,64 +78,15 @@ class DG16MGrasps:
         
         positive_indices = data['grasps/fc_passing_indices'][()]
         negative_indices = data['grasps/fc_failed_indices'][()]
-        #positive_grasps = grasps[positive_indices]
-        #negative_grasps = grasps[negative_indices]
-
-        #reachability labels
-        
-        positive_reach_indices = data['grasps/reach_passing_indices'][()]
-        negative_reach_indices = data['grasps/reach_failed_inidices'][()]
-        #positive_reach_grasps = grasps[positive_reach_indices]
-        #negative_reach_grasps = grasps[negative_reach_indices]
-
+        positive_grasps = grasps[positive_indices]
+        negative_grasps = grasps[negative_indices]
         if self.positive_negative: 
-            selected_indices = np.concatenate([positive_indices, negative_indices])
-
-            grasps = grasps[selected_indices]
-
-            fc_labels = np.concatenate(
-                [np.ones(len(positive_indices), dtype=np.float32),
-                np.zeros(len(negative_indices), dtype=np.float32)])
-
-            # reach labels
-            reach_positive_set = set(positive_reach_indices.tolist())
-            reach_labels = np.array([
-                    1.0 if idx in reach_positive_set else 0.0
-                    for idx in selected_indices
-                ],dtype=np.float32)
-
-            perm = np.random.permutation(len(grasps))
-            #permute
-            grasps = grasps[perm]
-            fc_labels = fc_labels[perm]
-            reach_labels = reach_labels[perm]
-
-            self.fc_labels = fc_labels
-            self.reach_labels = reach_labels
-
-
-            self.labels = fc_labels
-
-
+            grasps = np.concatenate((positive_grasps, negative_grasps), axis=0)
+            self.labels = np.concatenate((np.ones(positive_grasps.shape[0]), 
+                                 np.zeros(negative_grasps.shape[0])), axis=0)
         else:
-            selected_indices = positive_indices
-            grasps = grasps[selected_indices]
-
-            fc_labels = np.ones(len(selected_indices), dtype=np.float32)
-
-            reach_positive_set = set(positive_reach_indices.tolist())
-            reach_labels = np.array(
-                [
-                    1.0 if idx in reach_positive_set else 0.0
-                    for idx in selected_indices
-                ],
-                dtype=np.float32
-            )
-
-            self.fc_labels = fc_labels
-            self.reach_labels = reach_labels
-            self.labels = fc_labels
-
+            grasps = grasps[positive_indices]
+            self.labels = np.ones(positive_grasps.shape[0])
         return grasps
     
     def load_mesh(self):
@@ -145,9 +95,6 @@ class DG16MGrasps:
         mesh.apply_scale(self.mesh_scale)
         return mesh
     
-
-
-#----TODO: dataset changes here, need to make changes to add reachability constraints
 class DG16MPointcloudSDFDataset(Dataset):
     def __init__(self, 
                  grasps_dir, 
@@ -221,7 +168,7 @@ class DG16MPointcloudSDFDataset(Dataset):
         while True:
             rot = np.random.randn(3) * 15
             if np.linalg.norm(rot) > 10:
-                T[:3, :3] = R.from_euler('xyz', rot, degrees=True).as_matrix()#random rotations
+                T[:3, :3] = R.from_euler('xyz', rot, degrees=True).as_matrix()
                 break
         # T[:3, 3] = np.random.uniform(-0.001, 0.001, size=3) * 8
         return T
@@ -242,16 +189,15 @@ class DG16MPointcloudSDFDataset(Dataset):
     #     indices_to_take = np.random.choice(grasps.shape[0], self.n_grasps, replace=not grasps.shape[0] > self.n_grasps)
     #     grasps = grasps[indices_to_take] # [n_grasps, 2, 4, 4]
     #     labels = grasp_object.labels[indices_to_take] # [n_grasps]\
-    
-    #---TODO:check the reach labels properly
+        
     def __getitem__(self, idx):
         grasp_object = self.grasp_objects[idx]
         pcd = grasp_object.mesh.sample(self.n_points) # [n_points, 3]
         grasps = grasp_object.grasps
         indices_to_take = np.random.choice(grasps.shape[0], self.n_grasps, replace=not grasps.shape[0] > self.n_grasps)
         grasps = grasps[indices_to_take] # [n_grasps, 2, 4, 4]
-        fc_labels = grasp_object.fc_labels[indices_to_take]
-        reach_labels = grasp_object.reach_labels[indices_to_take]
+        labels = grasp_object.labels[indices_to_take] # [n_grasps]
+        
         sdf_points, sdf = self.get_sdf(grasp_object)
         
         # scale everything by self.custom_scale
@@ -293,8 +239,7 @@ class DG16MPointcloudSDFDataset(Dataset):
         
         gt = {
             'sdf': torch.from_numpy(sdf).float(),
-            'labels': torch.from_numpy(fc_labels).float(),
-            'reach_labels': torch.from_numpy(reach_labels).float(),
+            'labels': torch.from_numpy(labels).float(),
         }
         
         return res, gt
