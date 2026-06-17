@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #RUNTIME WORLD UPDATES:: Call update_world with a new Scene to add, remove, or move obstacles without recreating the solver.
-#THIS IS IMPORTANT to just continue running curobo for every object at a streach
+#THIS IS IMPORTANT to just continue running curobo for every object at a strech
 
 
 

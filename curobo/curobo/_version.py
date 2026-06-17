@@ -6,5 +6,5 @@
 
 from curobo._src.util.version import get_version
 
-__version__ = get_version()
+__version__ = "0.0.0"
 del get_version

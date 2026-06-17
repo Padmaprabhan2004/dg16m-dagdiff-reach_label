@@ -4,19 +4,15 @@ python -m curobo.examples.getting_started.build_robot_model     --urdf curobo/co
 
 
 #DOUBTS:
-WHAT SHOULD I ADD AS END EFFECTOR? panda_hand, panda_hand_1. or the grippers, ee_link and ee_link_1
-
+WHAT SHOULD I ADD AS END EFFECTOR? panda_hand, panda_hand_1. or the grippers, ee_link and ee_link_1 --> need to change the .yml
 Dual Panda base link config still to be decided. Can be changed in urdf and then generate the corresponding .yml
-
-should i do batch ik? or reachability map? and then sample from it?
-
-reach labels are also based on the configuration, so should i use multiple urdf and .yml's or single config of dual panda? 
-
-current grasp poses dont collide with the obj, so should i just offset the grasp and check reachability?
+should i do batch ik? 
+or reachability map? and then sample from it?
 
 
 
 TODO:
 Need to visialize the accuracy of the collision spheres.
 Need to import objects, erase them and write to .h5
+
 

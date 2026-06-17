@@ -1,5 +1,4 @@
 import torch
-
 import argparse
 import sys
 import time
@@ -11,8 +10,9 @@ from curobo.types import Pose
 from curobo._src.geom.types import SceneCfg
 from curobo.viewer import ViserVisualizer
 import numpy as np
+import trimesh
 #For testing the dual panda setup, batched_ik, single_ik, ik_with collisions and visualization
-
+import viser.transforms as vtf
 
 
 def dual_panda_current_pose_test():
@@ -178,17 +178,8 @@ def batched_ik_dual_panda_2():
 
 #works
 def batched_ik_dual_panda():
-    """
-    Batch IK around the robot's current pose.
 
-    We first compute FK to find the current EE poses.
-    Then we generate 100 nearby targets by perturbing X.
 
-    This should have a very high success rate if
-    dual-arm IK is working correctly.
-    """
-
-    import torch
 
     from curobo.inverse_kinematics import (
         InverseKinematics,
@@ -240,6 +231,52 @@ def batched_ik_dual_panda():
         n_poses,
     )
 
+    
+    angle_deg = 20.0
+    angle_rad = torch.deg2rad(torch.tensor(angle_deg))
+
+    rand_axis = torch.randn(
+        n_poses,
+        3,
+        device="cuda",
+    )
+
+    rand_axis = rand_axis / rand_axis.norm(
+        dim=1,
+        keepdim=True,
+    )
+
+    rand_angle = (
+        torch.rand(
+            n_poses,
+            device="cuda",
+        ) * 2.0 - 1.0
+    ) * angle_rad
+
+    delta_q = torch.zeros(
+        n_poses,
+        4,
+        device="cuda",
+    )
+
+    delta_q[:,0] = torch.cos(rand_angle/2)
+
+    delta_q[:,1:] = (
+        rand_axis
+        * torch.sin(rand_angle/2).unsqueeze(-1)
+    )
+
+    def quat_mul(q1, q2):
+        w1,x1,y1,z1 = q1.unbind(-1)
+        w2,x2,y2,z2 = q2.unbind(-1)
+
+        return torch.stack([
+            w1*w2 - x1*x2 - y1*y2 - z1*z2,
+            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+            w1*z2 + x1*y2 - y1*x2 + z1*w2,
+        ], dim=-1)
+
     left_positions = (
         left_current.position
         + offsets
@@ -248,16 +285,18 @@ def batched_ik_dual_panda():
         right_current.position
         + offsets
     )
-    left_quaternions = (
-        left_current.quaternion
-        .expand(n_poses, -1)
-        .contiguous()
+
+    left_quaternions = quat_mul(
+        delta_q,
+        left_current.quaternion.expand(n_poses,-1)
     )
-    right_quaternions = (
-        right_current.quaternion
-        .expand(n_poses, -1)
-        .contiguous()
+
+    right_quaternions = quat_mul(
+        delta_q,
+        right_current.quaternion.expand(n_poses,-1)
     )
+
+
     left_goal = Pose(
         position=left_positions,
         quaternion=left_quaternions,
@@ -286,9 +325,10 @@ def batched_ik_dual_panda():
         f"({100*n_success/n_poses:.1f}% success)"
     )
 
-    # ==========================================
-    # Diagnostics
-    # ==========================================
+    print(
+        "Orientation error:",
+        result.rotation_error.mean().item()
+    )
 
     if n_success > 0:
 
@@ -312,17 +352,8 @@ def batched_ik_dual_panda():
 
 
 def batched_ik_with_obstacle():
-    """
-    Batch IK around the robot's current pose.
 
-    We first compute FK to find the current EE poses.
-    Then we generate 100 nearby targets by perturbing X.
 
-    This should have a very high success rate if
-    dual-arm IK is working correctly.
-    """
-
-    import torch
 
     from curobo.inverse_kinematics import (
         InverseKinematics,
@@ -387,8 +418,8 @@ def batched_ik_with_obstacle():
 
     #can change this to get wider range of perts for testing ik, +-0.5 gives <100% reach
     offsets[:, 0] = torch.linspace(
-        -0.1,
-        0.1,
+        -0.6,
+        0.6,
         n_poses,
     )
 
@@ -454,9 +485,22 @@ def batched_ik_with_obstacle():
 
     return n_success > 0
 
+
+def make_grounded_mesh(file_path, name="object", x=0.0, y=0.7, z_floor=0.0):
+    mesh =trimesh.load(file_path, force="mesh", process=False)
+    if isinstance(mesh, trimesh.Scene):
+        mesh = mesh.dump(concatenate=True)
+    z_offset = float(-mesh.bounds[0, 2] + z_floor)
+    return Mesh(
+        name=name,
+        pose=[float(x), float(y)+0.2, z_offset, 1, 0, 0, 0], #0.2 offset form the arms
+        file_path=file_path,
+    )
+
+
 def reachability_map(robot_file="dual_franka.yml", port=8080):
 
-    import viser.transforms as vtf
+
 
     BATCH_TARGET = 100
     n_per_axis = int(BATCH_TARGET ** 0.5)
@@ -472,21 +516,23 @@ def reachability_map(robot_file="dual_franka.yml", port=8080):
         add_robot_to_scene=True,
     )
 
-    #change the location 
-    cube = Cuboid(
+    #change the location in front of the dual arm
+    '''cube = Cuboid(
         name="workspace_cuboid",
         pose=[0.0, 0.7, 0.1, 1, 0, 0, 0],
         dims=[0.15, 0.15, 0.15],
+    )'''
+
+    obj = make_grounded_mesh(
+        "/home/prabhu2004/Desktop/curobo/meshes/monitor.obj",
+        name="object",
+        x=0.0,
+        y=0.7,
+        z_floor=0.0,
     )
 
-    #cube = Mesh(
-        #name="object",
-        #pose=[0.0, 0.7, 0.1, 1, 0, 0, 0],
-        #file_path="/home/prabhu2004/Desktop/curobo/meshes/monitor.obj",
-    #)
 
-
-    scene_cfg = SceneCfg(cuboid=[cube])
+    scene_cfg = SceneCfg(mesh=[obj])
     server = viser_viz._server
     obstacle_frames = viser_viz.add_scene(scene_cfg, add_control_frames=True)
 
@@ -497,11 +543,11 @@ def reachability_map(robot_file="dual_franka.yml", port=8080):
         scene_model="collision_table.yml",
         self_collision_check=True,
         max_batch_size=total_batch,
-        collision_cache={"cube":10}
+        collision_cache={"mesh":10}
     )
 
     ik = InverseKinematics(config)
-    ik.update_world(Scene(cuboid=[cube]))
+    ik.update_world(Scene(mesh=[obj]))
     ik.exit_early = False
     all_target_links = ik.tool_frames
     primary_link = all_target_links[0]
@@ -536,8 +582,8 @@ def reachability_map(robot_file="dual_franka.yml", port=8080):
     cube_frame = server.scene.add_transform_controls(
         "/workspace_cuboid",
         scale=0.12,
-        position=tuple(cube.pose[:3]),
-        wxyz=tuple(cube.pose[3:]),
+        position=tuple(obj.pose[:3]),
+        wxyz=tuple(obj.pose[3:]),
     )
 
     with server.gui.add_folder("Reachability"):
@@ -745,6 +791,6 @@ def reachability_map(robot_file="dual_franka.yml", port=8080):
 if __name__ == "__main__":
 
     #dual_panda_current_pose_test()
-    #batched_ik_dual_panda()
+    batched_ik_dual_panda()
     #batched_ik_with_obstacle()
-    reachability_map()
+    #reachability_map()
