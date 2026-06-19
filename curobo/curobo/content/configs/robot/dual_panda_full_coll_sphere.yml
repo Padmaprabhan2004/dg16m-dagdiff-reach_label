@@ -892,8 +892,8 @@ kinematics:
     world_base_link:
     - base_fixture_link
   tool_frames:
-  - panda_hand
-  - panda_hand_1
+  - ee_link
+  - ee_link_1
   urdf_path: /home/prabhu2004/Desktop/curobo/curobo/content/assets/robot/franka_description/dual_franka_panda.urdf
   use_external_assets: false
   use_global_cumul: true

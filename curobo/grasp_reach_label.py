@@ -48,27 +48,12 @@ def matrix_to_pose(mat):
     return Pose(position=position, quaternion=quaternion)
 
 
-def transform_grasp_to_world(T_world_obj, grasp, pregrasp_distance=0.0, approach_axis="y"):
-    grasp_T_obj = pose_to_matrix(grasp)
-    if pregrasp_distance != 0.0:
-        axis_map = {
-            "x": np.array([1.0, 0.0, 0.0], dtype=np.float32),
-            "y": np.array([0.0, 1.0, 0.0], dtype=np.float32),
-            "z": np.array([0.0, 0.0, 1.0], dtype=np.float32),
-        }
-        if approach_axis not in axis_map:
-            raise ValueError(f"Unsupported approach_axis={approach_axis!r}")
-        world_grasp = T_world_obj @ grasp_T_obj
-        local_axis_world = world_grasp[:3, :3] @ axis_map[approach_axis]
-        # Move backward along the grasp's local -y axis in world coordinates.
-        world_grasp = world_grasp.copy()
-        world_grasp[:3, 3] = world_grasp[:3, 3] - pregrasp_distance * local_axis_world
-        return world_grasp
-    return T_world_obj @ grasp_T_obj
+def transform_grasp_to_world(T_world_obj, grasp):
+    return T_world_obj @ pose_to_matrix(grasp)
 
 
 def build_dual_arm_goal(ik, left_T_world, right_T_world):
-    #use ee_link,ee_link1
+    # ee_link is the right arm; ee_link_1 is the left arm in the dual configs.
     goal_dict = {
         "ee_link": matrix_to_pose(right_T_world),
         "ee_link_1": matrix_to_pose(left_T_world),
@@ -91,6 +76,15 @@ def get_reach_label_from_ik(ik, goal):
     """Return 1 if both arms solve the grasp pose, else 0."""
     result = ik.solve_pose(goal)
     return float(bool(result.success.item())), result
+
+
+def _default_current_state(ik: InverseKinematics):
+    # Keep it consistent with other examples in this repo.
+    # get_active_js expects a joint-state tensor shaped like default_joint_state.
+    return ik.get_active_js(ik.default_joint_state.clone()).unsqueeze(0)
+
+
+
 
 
 def add_frame_axes(server, name, pose_mat, axis_len=0.08):
@@ -120,10 +114,8 @@ def visualize_grasp_frame(
     sample_grasp=4,
     grasp_path="/home/prabhu2004/Desktop/curobo/grasps",
     mesh_path="/home/prabhu2004/Desktop/curobo/meshes",
-    object="monitor",
-    pregrasp_distance=0.08
+    object="model_normalized",
 ):
-    #pregrasp_distance = 0.03
     viser_viz = ViserVisualizer(
         content_path=ContentPath(robot_config_file=robot_file),
         connect_ip="0.0.0.0",
@@ -160,12 +152,8 @@ def visualize_grasp_frame(
         T_world_obj[:3, 3] = obj_pose[:3]
 
         #T_world_grasp, grasps in world frame
-        left_T_world = transform_grasp_to_world(
-            T_world_obj, sample_grasp_pair[0], pregrasp_distance=pregrasp_distance
-        )
-        right_T_world = transform_grasp_to_world(
-            T_world_obj, sample_grasp_pair[1], pregrasp_distance=pregrasp_distance
-        )
+        left_T_world = T_world_obj @ pose_to_matrix(sample_grasp_pair[0])
+        right_T_world = T_world_obj @ pose_to_matrix(sample_grasp_pair[1])
 
         add_frame_axes(server, "/grasp_debug/object", T_world_obj, axis_len=0.06)
         add_frame_axes(server, "/grasp_debug/left_grasp", left_T_world, axis_len=0.08)
@@ -188,6 +176,86 @@ def visualize_grasp_frame(
         time.sleep(0.1)
 
 
+
+
+
+#reach ik
+
+
+def get_single_arm_reachability(
+    ik: InverseKinematics,
+    left_T_world,
+    right_T_world,
+    obj=None,
+):
+    """two single-arm grasps using a dual-arm robot model."""
+
+    tool_frames = ik.tool_frames
+    home_kin = ik.compute_kinematics(ik.default_joint_state.clone())
+    home_tool_poses = home_kin.tool_poses
+
+    if len(tool_frames) < 2:
+        raise ValueError(f"Expected a dual-arm robot, got tool frames {tool_frames}")
+
+    def _goal_for(target_frame: str, target_pose, stationary_frame: str):
+        return GoalToolPose.from_poses(
+            {
+                target_frame: matrix_to_pose(target_pose),
+                stationary_frame: home_tool_poses[stationary_frame].clone(),
+            },
+            ordered_tool_frames=tool_frames,
+            num_goalset=1,
+        )
+
+    if "ee_link" in tool_frames and "ee_link_1" in tool_frames:
+        right_frame = "ee_link"
+        left_frame = "ee_link_1"
+    else:
+        left_frame = tool_frames[0]
+        right_frame = tool_frames[1]
+
+    left_goal = _goal_for(left_frame, left_T_world, right_frame)
+    right_goal = _goal_for(right_frame, right_T_world, left_frame)
+
+    if obj is not None:
+        ik.update_world(Scene(mesh=[obj]))
+
+    left_result = ik.solve_pose(left_goal, current_state=_default_current_state(ik), return_seeds=1)
+    right_result = ik.solve_pose(right_goal, current_state=_default_current_state(ik), return_seeds=1)
+
+    left_success = bool(left_result.success.item())
+    right_success = bool(right_result.success.item())
+
+    dual_success = False
+    dual_result = None
+    if left_success and right_success:
+        ik.update_world(Scene(mesh=[]))
+        dual_goal = GoalToolPose.from_poses(
+            {
+                left_frame: matrix_to_pose(left_T_world),
+                right_frame: matrix_to_pose(right_T_world),
+            },
+            ordered_tool_frames=tool_frames,
+            num_goalset=1,
+        )
+        dual_result = ik.solve_pose(
+            dual_goal,
+            current_state=_default_current_state(ik),
+            return_seeds=1,
+        )
+        dual_success = bool(dual_result.success.item())
+
+    return {
+        "left_success": float(left_success),
+        "right_success": float(right_success),
+        "dual_success": float(dual_success),
+        "left_result": left_result,
+        "right_result": right_result,
+        "dual_result": dual_result,
+    }
+
+
+
 def check_one_grasp_reachabilbilty(
     robot_file="dual_franka.yml",
     port=8080,
@@ -195,12 +263,11 @@ def check_one_grasp_reachabilbilty(
     grasp_path="/home/prabhu2004/Desktop/curobo/grasps",
     mesh_path="/home/prabhu2004/Desktop/curobo/meshes",
     object="monitor",
-    pregrasp_distance = 0.08
 ):
     '''
     viser_viz = ViserVisualizer(
         content_path=ContentPath(robot_config_file=robot_file),
-        connect_ip="0.0.0.0",    
+        connect_ip="0.0.0.0",
         connect_port=port,
         add_control_frames=False,
         visualize_robot_spheres=False,
@@ -208,7 +275,7 @@ def check_one_grasp_reachabilbilty(
     )
     '''
 
-    #pregrasp_distance = 0.08
+    
     obj = make_grounded_mesh(
         os.path.join(mesh_path, f"{object}.obj"),
         name="object",
@@ -225,8 +292,7 @@ def check_one_grasp_reachabilbilty(
         robot=robot_file,
         scene_model="collision_table.yml",
         self_collision_check=True,
-        #max_batch_size=total_batch,
-        #collision_cache={"mesh":10}
+        collision_cache={"mesh": 10},
     )
 
     ik = InverseKinematics(config)
@@ -252,20 +318,16 @@ def check_one_grasp_reachabilbilty(
         )[:3, :3]
 
         sample_grasp_pair = grasps[grasp_idx]
-        left_T_world = transform_grasp_to_world(
-            object_T_world, sample_grasp_pair[0], pregrasp_distance=pregrasp_distance
-        )
-        right_T_world = transform_grasp_to_world(
-            object_T_world, sample_grasp_pair[1], pregrasp_distance=pregrasp_distance
-        )
+        left_T_world = transform_grasp_to_world(object_T_world, sample_grasp_pair[0])
+        right_T_world = transform_grasp_to_world(object_T_world, sample_grasp_pair[1])
 
-        goal = build_dual_arm_goal(ik, left_T_world, right_T_world)
-        reach_label, result = get_reach_label_from_ik(ik, goal)
+        reachability = get_single_arm_reachability(ik, left_T_world, right_T_world, obj=obj)
+        reach_label = reachability["dual_success"]
+        result = reachability["dual_result"] if reachability["dual_result"] is not None else reachability["left_result"]
 
-        print("Success:")
-        print(result.success.item())
+        print(f"left_single={reachability['left_success']}, right_single={reachability['right_success']}, dual={reachability['dual_success']}")
 
-        if hasattr(result, "position_error"):
+        if result is not None and hasattr(result, "position_error"):
             print("\nPosition Error (m):")
             print(result.position_error)
 
@@ -288,7 +350,7 @@ def check_one_grasp_reachabilbilty(
     return reach_label
 
 
-def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka.yml",pregrasp_distance=0.08):
+def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka.yml",):
     """ADDS:
     - `grasps/reach_labels`
     - `grasps/reach_passing_indices`
@@ -311,13 +373,11 @@ def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka
         robot=robot_file,
         scene_model="collision_table.yml",
         self_collision_check=True,
-        #max_batch_size=total_batch,
-        collision_cache={"mesh":10}
+        collision_cache={"mesh": 10},
     )
 
     ik = InverseKinematics(config)
     ik.update_world(Scene(mesh=[obj]))
-    #pregrasp_distance = 0.08
 
     grasp_file = os.path.join(grasp_path, f"{obj_name}.h5")
     with h5py.File(grasp_file, "r+") as data:
@@ -333,14 +393,10 @@ def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka
 
         for i in range(grasps.shape[0]):
             grasp_pair = grasps[i]
-            left_T_world = transform_grasp_to_world(
-                object_T_world, grasp_pair[0], pregrasp_distance=pregrasp_distance
-            )
-            right_T_world = transform_grasp_to_world(
-                object_T_world, grasp_pair[1], pregrasp_distance=pregrasp_distance
-            )
-            goal = build_dual_arm_goal(ik, left_T_world, right_T_world)
-            label, _ = get_reach_label_from_ik(ik, goal)
+            left_T_world = transform_grasp_to_world(object_T_world, grasp_pair[0])
+            right_T_world = transform_grasp_to_world(object_T_world, grasp_pair[1])
+            reachability = get_single_arm_reachability(ik, left_T_world, right_T_world, obj=obj)
+            label = reachability["dual_success"]
             reach_labels[i] = label
             if label > 0.5:
                 reach_passing_indices.append(i)
@@ -363,11 +419,7 @@ def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka
 
 import argparse
 
-# dual panda is the one with more offset ie 1.2, dual franka is 0.9
-#|
-#|
-#dual_panda.yml is has negligible collision sphere radius for the gripper,
-#dual_panda_full_coll_sphere.yml is complete dual_panda
+# dual panda is the one with more offset
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -376,35 +428,28 @@ if __name__ == "__main__":
         "--robot_file",
         type=str,
         default="dual_panda.yml",
-        help="path to robot configuration file."
+        help="Path to robot configuration file."
     )
 
     parser.add_argument(
         "--visualize",
         action="store_true",
-        help="visualize grasp frames before running reachability check."
-    )
-
-    parser.add_argument(
-        "--pregrasp_distance",
-        type=float,
-        default=0.0,
-        help="select the pre grasping distance along the approach vector to the object"
+        help="Visualize grasp frames before running reachability check."
     )
 
     args = parser.parse_args()
 
+
     if args.visualize:
         visualize_grasp_frame(
-            robot_file=args.robot_file,pregrasp_distance=args.pregrasp_distance
+            robot_file=args.robot_file,
         )
     else:
         reach=0
         total=100
         for i in range (1,100):
 
-            if check_one_grasp_reachabilbilty(robot_file=args.robot_file,sample_grasp=i,pregrasp_distance=args.pregrasp_distance):
+            if check_one_grasp_reachabilbilty(robot_file=args.robot_file,sample_grasp=i):
                 reach+=1
             
-        print("Reached",reach,"/",total," poses")
-    pregrasp_distance = 0.08
+        print("Reached ",reach,"/",total," poses")
