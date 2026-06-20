@@ -25,7 +25,7 @@ def make_grounded_mesh(file_path, name="object", x=0.0, y=0.7, z_floor=0.0):
 
     return Mesh(
         name=name,
-        pose=[float(x), float(y) + 0.001, z_offset, 1, 0, 0, 0],
+        pose=[float(x), float(y) + 0.002, z_offset, 1, 0, 0, 0],
         file_path=file_path,
     )
 
@@ -79,6 +79,43 @@ def build_dual_arm_goal(ik, left_T_world, right_T_world):
         num_goalset=1,
     )
 
+def build_dual_arm_goal_batch(ik, left_T_world_batch, right_T_world_batch):
+    """Build a batched dual-arm goal from stacked world-frame poses."""
+    
+    left_positions = torch.tensor(
+        left_T_world_batch[:, :3, 3], device="cuda", dtype=torch.float32
+    )
+    right_positions = torch.tensor(
+        right_T_world_batch[:, :3, 3], device="cuda", dtype=torch.float32
+    )
+    left_quats = torch.tensor(
+        np.stack(
+            [trimesh.transformations.quaternion_from_matrix(m) for m in left_T_world_batch],
+            axis=0,
+        ),
+        device="cuda",
+        dtype=torch.float32,
+    )
+    right_quats = torch.tensor(
+        np.stack(
+            [trimesh.transformations.quaternion_from_matrix(m) for m in right_T_world_batch],
+            axis=0,
+        ),
+        device="cuda",
+        dtype=torch.float32,
+    )
+
+    goal_dict = {
+        "ee_link": Pose(position=right_positions, quaternion=right_quats),
+        "ee_link_1": Pose(position=left_positions, quaternion=left_quats),
+    }
+    return GoalToolPose.from_poses(
+        goal_dict,
+        ordered_tool_frames=ik.tool_frames,
+        num_goalset=1,
+    )
+
+
 
 def load_grasp_object_file(grasp_path, object_name):
     grasp_file = os.path.join(grasp_path, f"{object_name}.h5")
@@ -88,7 +125,6 @@ def load_grasp_object_file(grasp_path, object_name):
 
 
 def get_reach_label_from_ik(ik, goal):
-    """Return 1 if both arms solve the grasp pose, else 0."""
     result = ik.solve_pose(goal)
     return float(bool(result.success.item())), result
 
@@ -117,7 +153,7 @@ def add_frame_axes(server, name, pose_mat, axis_len=0.08):
 def visualize_grasp_frame(
     robot_file="dual_franka.yml",
     port=8080,
-    sample_grasp=4,
+    sample_grasp=1,
     grasp_path="/home/prabhu2004/Desktop/curobo/grasps",
     mesh_path="/home/prabhu2004/Desktop/curobo/meshes",
     object="monitor",
@@ -197,18 +233,7 @@ def check_one_grasp_reachabilbilty(
     object="monitor",
     pregrasp_distance = 0.08
 ):
-    '''
-    viser_viz = ViserVisualizer(
-        content_path=ContentPath(robot_config_file=robot_file),
-        connect_ip="0.0.0.0",    
-        connect_port=port,
-        add_control_frames=False,
-        visualize_robot_spheres=False,
-        add_robot_to_scene=True,
-    )
-    '''
 
-    #pregrasp_distance = 0.08
     obj = make_grounded_mesh(
         os.path.join(mesh_path, f"{object}.obj"),
         name="object",
@@ -226,12 +251,16 @@ def check_one_grasp_reachabilbilty(
         scene_model="collision_table.yml",
         self_collision_check=True,
         #max_batch_size=total_batch,
-        #collision_cache={"mesh":10}
+        collision_cache={"mesh":10}
     )
 
     ik = InverseKinematics(config)
-    #ik.update_world(Scene(mesh=[obj]))
+    ik.update_world(Scene(mesh=[obj]))
+    print("\nObject pose:")
+    print(obj.pose)
 
+
+    #print(ik.scene_collision_checker)
     grasp_file = os.path.join(grasp_path, f"{object}.h5")
     with h5py.File(grasp_file, "r") as data:
         grasps = data["grasps/grasps"][()]
@@ -287,16 +316,18 @@ def check_one_grasp_reachabilbilty(
 
     return reach_label
 
+from tqdm import tqdm
+def write_grasp_reachability_labels(robot_file="dual_panda.yml",pregrasp_distance=0.08,grasp_path="/home/prabhu2004/Desktop/curobo/grasps/",
+    mesh_path="/home/prabhu2004/Desktop/curobo/meshes/",obj_name="monitor.obj",batch_size=64):
 
-def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka.yml",pregrasp_distance=0.08):
-    """ADDS:
-    - `grasps/reach_labels`
-    - `grasps/reach_passing_indices`
-    - `grasps/reach_failed_indices`
+    """batch_ik, gives
+    - `reach_labels`
+    - `reach_passing_indices`
+    - `reach_failed_indices` 
+    as {object_name}_reachability.h5
     """
-    obj_name = os.path.basename(mesh_path).split(".")[0]
     obj = make_grounded_mesh(
-        os.path.join(mesh_path, f"{obj_name}.obj"),
+        os.path.join(mesh_path,obj_name),
         name="object",
         x=0.0,
         y=0.7,
@@ -311,17 +342,20 @@ def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka
         robot=robot_file,
         scene_model="collision_table.yml",
         self_collision_check=True,
-        #max_batch_size=total_batch,
+        num_seeds=32,
+        max_batch_size=batch_size,
         collision_cache={"mesh":10}
     )
 
     ik = InverseKinematics(config)
     ik.update_world(Scene(mesh=[obj]))
-    #pregrasp_distance = 0.08
 
+
+    obj_name = obj_name.split(".")[0]
     grasp_file = os.path.join(grasp_path, f"{obj_name}.h5")
-    with h5py.File(grasp_file, "r+") as data:
+    with h5py.File(grasp_file, "r") as data:
         grasps = data["grasps/grasps"][()]
+        #grasps=grasps[:100]
         if grasps.ndim != 4 or grasps.shape[1:] != (2, 4, 4):
             raise ValueError(
                 f"Expected grasps with shape [N, 2, 4, 4], got {grasps.shape}"
@@ -330,36 +364,96 @@ def write_grasp_reachability_labels(grasp_path,mesh_path,robot_file="dual_franka
         reach_labels = np.zeros((grasps.shape[0],), dtype=np.float32)
         reach_passing_indices = []
         reach_failed_indices = []
+        for start in tqdm(range(0, grasps.shape[0], batch_size), desc=f"{obj_name}"):
+            end = min(start + batch_size, grasps.shape[0])
+            batch_grasps = grasps[start:end]
 
-        for i in range(grasps.shape[0]):
-            grasp_pair = grasps[i]
-            left_T_world = transform_grasp_to_world(
-                object_T_world, grasp_pair[0], pregrasp_distance=pregrasp_distance
+            left_T_world_batch = np.stack(
+                [
+                    transform_grasp_to_world(
+                        object_T_world,
+                        grasp_pair[0],
+                        pregrasp_distance=pregrasp_distance,
+                    )
+                    for grasp_pair in batch_grasps
+                ],
+                axis=0,
             )
-            right_T_world = transform_grasp_to_world(
-                object_T_world, grasp_pair[1], pregrasp_distance=pregrasp_distance
+            right_T_world_batch = np.stack(
+                [
+                    transform_grasp_to_world(
+                        object_T_world,
+                        grasp_pair[1],
+                        pregrasp_distance=pregrasp_distance,
+                    )
+                    for grasp_pair in batch_grasps
+                ],
+                axis=0,
             )
-            goal = build_dual_arm_goal(ik, left_T_world, right_T_world)
-            label, _ = get_reach_label_from_ik(ik, goal)
-            reach_labels[i] = label
-            if label > 0.5:
-                reach_passing_indices.append(i)
-            else:
-                reach_failed_indices.append(i)
 
-        def _write_or_replace(name, arr):
-            if f"grasps/{name}" in data:
-                del data[f"grasps/{name}"]
-            data.create_dataset(f"grasps/{name}", data=np.asarray(arr))
+            goal = build_dual_arm_goal_batch(ik, left_T_world_batch, right_T_world_batch)
+            result = ik.solve_pose(goal)
+            batch_success = np.asarray(result.success.detach().cpu()).reshape(-1).astype(bool)
 
-        _write_or_replace("reach_labels", reach_labels)
-        _write_or_replace("reach_passing_indices", np.asarray(reach_passing_indices, dtype=np.int64))
-        _write_or_replace("reach_failed_indices", np.asarray(reach_failed_indices, dtype=np.int64))
+            for idx, ok in enumerate(batch_success):
+                reach_labels[start + idx] = float(ok)
+                if ok:
+                    reach_passing_indices.append(start + idx)
+                else:
+                    reach_failed_indices.append(start + idx)
 
-        print(
-            f"Wrote reach labels for {grasps.shape[0]} grasps: "
-            f"{len(reach_passing_indices)} pass, {len(reach_failed_indices)} fail"
+
+        reach_file = os.path.join(
+            grasp_path,
+            f"{obj_name}_reachability.h5"
         )
+
+        print("\nSaving reachability labels:")
+        print(reach_file)
+
+        with h5py.File(reach_file, "w") as out:
+
+            out.create_dataset(
+                "reach_labels",
+                data=reach_labels
+            )
+
+            out.create_dataset(
+                "reach_passing_indices",
+                data=np.asarray(
+                    reach_passing_indices,
+                    dtype=np.int64,
+                )
+            )
+
+            out.create_dataset(
+                "reach_failed_indices",
+                data=np.asarray(
+                    reach_failed_indices,
+                    dtype=np.int64,
+                )
+            )
+
+            out.attrs["object_name"] = obj_name
+            out.attrs["num_grasps"] = grasps.shape[0]
+            out.attrs["num_reachable"] = len(
+                reach_passing_indices
+            )
+
+        success_rate = (
+            100.0 *
+            len(reach_passing_indices)
+            / grasps.shape[0]
+        )
+
+        print("\nFinished")
+        print(f"Object: {obj_name}")
+        print(f"Total grasps: {grasps.shape[0]}")
+        print(f"Reachable: {len(reach_passing_indices)}")
+        print(f"Unreachable: {len(reach_failed_indices)}")
+        print(f"Success Rate: {success_rate:.2f}%")
+
+
 
 import argparse
 
@@ -388,7 +482,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pregrasp_distance",
         type=float,
-        default=0.0,
+        default=0.08,
         help="select the pre grasping distance along the approach vector to the object"
     )
 
@@ -399,12 +493,48 @@ if __name__ == "__main__":
             robot_file=args.robot_file,pregrasp_distance=args.pregrasp_distance
         )
     else:
-        reach=0
+        '''reach=0
         total=100
-        for i in range (1,100):
+        for i in range (1,total):
 
             if check_one_grasp_reachabilbilty(robot_file=args.robot_file,sample_grasp=i,pregrasp_distance=args.pregrasp_distance):
                 reach+=1
             
-        print("Reached",reach,"/",total," poses")
-    pregrasp_distance = 0.08
+        print("Reached",reach,"/",total," poses")'''
+        mesh_path = "/home/prabhu2004/Desktop/curobo/meshes"
+        grasp_path = "/home/prabhu2004/Desktop/curobo/grasps"
+
+        mesh_files = sorted(
+            [
+                f for f in os.listdir(mesh_path)
+                if f.endswith(".obj")
+            ]
+        )
+
+        print(f"\nFound {len(mesh_files)} mesh files\n")
+
+        for obj_name in mesh_files:
+
+            grasp_file = os.path.join(
+                grasp_path,
+                obj_name.replace(".obj", ".h5")
+            )
+
+            if not os.path.exists(grasp_file):
+                print(
+                    f"[SKIP] Missing grasp file: "
+                    f"{os.path.basename(grasp_file)}"
+                )
+                continue
+
+            print("\n" + "=" * 80)
+            print(f"Processing: {obj_name}")
+            print("=" * 80)
+
+            write_grasp_reachability_labels(
+                robot_file=args.robot_file,
+                pregrasp_distance=args.pregrasp_distance,
+                obj_name=obj_name,
+                grasp_path=grasp_path,
+                mesh_path=mesh_path,
+            )

@@ -32,73 +32,73 @@ kinematics:
       - -0.0013446903321892023
       - -0.07915972173213959
       - 0.0438651479780674
-      radius: 0.025829635560512543
+      radius: 0.021829635560512543
     - center:
       - 0.004718888085335493
       - -0.030949577689170837
       - 0.02584887482225895
-      radius: 0.028267687186598778
+      radius: 0.022267687186598778
     - center:
       - 0.001517829834483564
       - 0.026983657851815224
       - 0.031541597098112106
-      radius: 0.02950865775346756
+      radius: 0.02350865775346756
     - center:
       - -0.0036634644493460655
       - 0.07376920431852341
       - 0.0011379228672012687
-      radius: 0.01817803643643856
+      radius: 0.01417803643643856
     - center:
       - -0.0028364534955471754
       - -0.08039326965808868
       - 0.004930643364787102
-      radius: 0.02449627034366131
+      radius: 0.02149627034366131
     - center:
       - 0.0017799491761252284
       - 0.08107449859380722
       - 0.03724969923496246
-      radius: 0.02796352095901966
+      radius: 0.02296352095901966
     panda_hand_1:
     - center:
       - -0.0013770133955404162
       - -0.07436419278383255
       - 0.04326333478093147
-      radius: 0.025814929977059364
+      radius: 0.021814929977059364
     - center:
       - 0.0011721982154995203
       - -0.020763859152793884
       - 0.03381236270070076
-      radius: 0.029913824051618576
+      radius: 0.023913824051618576
     - center:
       - -0.0007134941406548023
       - 0.021957842633128166
       - 0.030360881239175797
-      radius: 0.032232437282800674
+      radius: 0.022232437282800674
     - center:
       - 0.0002804260584525764
       - -0.07544634491205215
       - 0.007922080345451832
-      radius: 0.025752656161785126
+      radius: 0.022752656161785126
     - center:
       - 0.001854984788224101
       - 0.0755859836935997
       - 0.039952389895915985
-      radius: 0.02711937017738819
+      radius: 0.02211937017738819
     - center:
       - 0.007896081544458866
       - -0.045602936297655106
       - -0.001824775943532586
-      radius: 0.008705748245120049
+      radius: 0.004705748245120049
     - center:
       - 0.028461866080760956
       - 0.008367594331502914
       - 0.000744369113817811
-      radius: 0.004957056604325771
+      radius: 0.002957056604325771
     - center:
       - -0.017452554777264595
       - 0.019198747351765633
       - -0.0002802647650241852
-      radius: 0.0028660232201218605
+      radius: 0.0018660232201218605
     panda_leftfinger:
     - center:
       - 1.9197191249986645e-06
@@ -710,9 +710,6 @@ kinematics:
     - panda_leftfinger
     - panda_rightfinger
     - ee_link
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
     panda_hand_1:
     - panda_link8_1
     - panda_leftfinger_1
@@ -726,61 +723,16 @@ kinematics:
     - panda_hand_1
     panda_link0:
     - base_link
-    - panda_link1
-    - panda_link2
-    - panda_link3
-    - panda_link4
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
-    - panda_link4_1
-    - panda_link5_1
-    - panda_link6_1
-    - panda_link7_1
-    - panda_hand_1
-    - panda_leftfinger_1
-    - panda_rightfinger_1
     panda_link0_1:
     - base_link_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
     panda_link1:
     - panda_link0
-    - panda_link2
-    - panda_link3
-    - panda_link4
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
-    - panda_link4_1
-    - panda_link5_1
-    - panda_link6_1
-    - panda_link7_1
-    - panda_hand_1
-    - panda_leftfinger_1
-    - panda_rightfinger_1
     panda_link1_1:
     - panda_link0_1
-    - panda_link2_1
-    - panda_link3_1
-    - panda_link4_1
     panda_link2:
     - panda_link1
     - panda_link3
     - panda_link4
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
-    - panda_link4_1
-    - panda_link5_1
-    - panda_link6_1
-    - panda_link7_1
-    - panda_hand_1
-    - panda_leftfinger_1
     panda_link2_1:
     - panda_link1_1
     - panda_link3_1
@@ -792,12 +744,6 @@ kinematics:
     - panda_link6
     - panda_link7
     - panda_hand
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
-    - panda_link4_1
-    - panda_link5_1
     - panda_leftfinger
     - panda_rightfinger
     panda_link3_1:
@@ -815,11 +761,6 @@ kinematics:
     - panda_link6
     - panda_link7
     - panda_hand
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
-    - panda_link4_1
     - panda_leftfinger
     - panda_rightfinger
     panda_link4_1:
@@ -834,10 +775,6 @@ kinematics:
     - panda_link4
     - panda_link6
     - panda_link7
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
-    - panda_link3_1
     panda_link5_1:
     - panda_link4_1
     - panda_link6_1
@@ -845,9 +782,6 @@ kinematics:
     - panda_link5
     - panda_link7
     - panda_hand
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
     - panda_leftfinger
     - panda_rightfinger
     panda_link6_1:
@@ -861,9 +795,6 @@ kinematics:
     - panda_link8
     - right_gripper
     - panda_hand
-    - panda_link0_1
-    - panda_link1_1
-    - panda_link2_1
     - panda_leftfinger
     - panda_rightfinger
     panda_link7_1:
@@ -881,8 +812,6 @@ kinematics:
     - panda_hand_1
     panda_rightfinger:
     - panda_hand
-    - panda_link0_1
-    - panda_link1_1
     panda_rightfinger_1:
     - panda_hand_1
     right_gripper:

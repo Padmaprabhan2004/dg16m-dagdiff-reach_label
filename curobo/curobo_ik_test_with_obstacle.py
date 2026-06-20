@@ -382,7 +382,7 @@ def batched_ik_with_obstacle():
         dims=[0.15, 0.15, 0.15],
     )
     config_with_cache = InverseKinematicsCfg.create(
-        robot="dual_franka.yml",
+        robot="dual_panda.yml",
         scene_model="collision_table.yml",
         num_seeds=32,
         max_batch_size=n_poses,
@@ -400,8 +400,8 @@ def batched_ik_with_obstacle():
         ik.default_joint_state
     )
 
-    left_current = kin_state.tool_poses["panda_hand"]
-    right_current = kin_state.tool_poses["panda_hand_1"]
+    left_current = kin_state.tool_poses["ee_link"]
+    right_current = kin_state.tool_poses["ee_link_1"]
 
     print("\nCurrent Left Position:")
     print(left_current.position)
@@ -453,8 +453,8 @@ def batched_ik_with_obstacle():
 
     goal = GoalToolPose.from_poses(
         {
-            "panda_hand": left_goal,
-            "panda_hand_1": right_goal,
+            "ee_link": left_goal,
+            "ee_link_1": right_goal,
         },
         ordered_tool_frames=ik.tool_frames,
         num_goalset=1,
@@ -791,6 +791,6 @@ def reachability_map(robot_file="dual_franka.yml", port=8080):
 if __name__ == "__main__":
 
     #dual_panda_current_pose_test()
-    batched_ik_dual_panda()
-    #batched_ik_with_obstacle()
+    #batched_ik_dual_panda()
+    batched_ik_with_obstacle()
     #reachability_map()
