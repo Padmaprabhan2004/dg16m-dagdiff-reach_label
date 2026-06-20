@@ -32,19 +32,21 @@ from scipy.spatial.transform import Rotation as R
 from trimesh.collision import CollisionManager
 
 class DG16MGrasps:
-    def __init__(self, grasp_path, mesh_path, scales, single_arm=False):
+    def __init__(self, grasp_path, mesh_path, reach_path, scales, single_arm=False):
         self.grasp_path = grasp_path
         self.mesh_path = mesh_path
+        self.reach_path =reach_path
         data = h5py.File(self.grasp_path, 'r')
+        reach_data = h5py.File(self.reach_path,'r')
         self.mesh_name = self.mesh_path.split('/')[-1].split('.')[0]
         self.mesh_scale = scales[self.mesh_name]
         self.single_arm = single_arm
         self.positive_negative = True
         
-        if single_arm:
+        if single_arm:#does it go into this branch
             self.grasps = self.load_grasps_for_collision_prediction(data, self.mesh_name)
         else:
-            self.grasps = self.load_grasps(data)
+            self.grasps = self.load_grasps(data,reach_data)
         self.mesh = self.load_mesh()        
         
     def load_grasps_for_collision_prediction(self, data, mesh_name):
@@ -59,7 +61,7 @@ class DG16MGrasps:
             np.ones(positive_grasps.shape[0], dtype=np.float32),
             np.zeros(negative_grasps.shape[0], dtype=np.float32)
         ))
-        
+        self.reach_labels = np.ones(len(grasps), dtype=np.float32)
         # print(f'Loaded {positive_grasps.shape} positive grasps and {negative_grasps.shape} negative grasps for {mesh_name}')
         grasps = np.concatenate((positive_grasps, negative_grasps), axis=0)
         
@@ -69,24 +71,32 @@ class DG16MGrasps:
         return grasps
         
 
-    def load_grasps(self, data):
+    def load_grasps(self, data,reach_data):
         grasps = data['grasps/grasps'][()]
+        reach_labels = reach_data['reach_labels']
         if self.single_arm:
             grasps = grasps.reshape(-1, 4, 4)
             self.labels = np.ones(grasps.shape[0], dtype=np.float32)
+            self.reach_labels = np.ones(grasps.shape[0],dtype=np.float32)
             return grasps
         
         positive_indices = data['grasps/fc_passing_indices'][()]
         negative_indices = data['grasps/fc_failed_indices'][()]
         positive_grasps = grasps[positive_indices]
         negative_grasps = grasps[negative_indices]
+
+        reach_labels_of_pos_grasps = np.array(reach_labels[positive_indices],dtype=np.float32)
+        reach_labels_of_neg_grasps = np.array(reach_labels[negative_indices],dtype=np.float32)
+
         if self.positive_negative: 
             grasps = np.concatenate((positive_grasps, negative_grasps), axis=0)
             self.labels = np.concatenate((np.ones(positive_grasps.shape[0]), 
                                  np.zeros(negative_grasps.shape[0])), axis=0)
+            self.reach_labels = np.concatenate((reach_labels_of_pos_grasps,reach_labels_of_neg_grasps),axis=0)
         else:
             grasps = grasps[positive_indices]
             self.labels = np.ones(positive_grasps.shape[0])
+            self.reach_labels = reach_labels_of_pos_grasps
         return grasps
     
     def load_mesh(self):
@@ -111,7 +121,8 @@ class DG16MPointcloudSDFDataset(Dataset):
         self.meshes_dir = meshes_dir
         self.sdf_dir = sdf_dir
         self.single_arm = single_arm
-        self.meshes_to_take = meshes_to_take        
+        self.meshes_to_take = meshes_to_take     
+        self.reach_dir=""   
         # print(self.grasps_dir)
         
         # self.grasp_files = os.listdir(self.grasps_dir)
@@ -128,8 +139,9 @@ class DG16MPointcloudSDFDataset(Dataset):
             try:
                 grasp_path = os.path.join(self.grasps_dir, grasp_file)
                 mesh_path = os.path.join(self.meshes_dir, grasp_file.replace('.h5', '.obj'))
+                reach_path = os.path.join(self.reach_dir,grasp_file.split('.')[0]+'_reachability.h5')
                 # print(grasp_path, mesh_path)
-                grasp_object = DG16MGrasps(grasp_path, mesh_path, self.scales, self.single_arm)
+                grasp_object = DG16MGrasps(grasp_path, mesh_path, reach_path, self.scales, self.single_arm)
                 if grasp_object.grasps.shape[0] > 0:
                     self.grasp_objects.append(grasp_object)
             except Exception as e:
@@ -197,6 +209,7 @@ class DG16MPointcloudSDFDataset(Dataset):
         indices_to_take = np.random.choice(grasps.shape[0], self.n_grasps, replace=not grasps.shape[0] > self.n_grasps)
         grasps = grasps[indices_to_take] # [n_grasps, 2, 4, 4]
         labels = grasp_object.labels[indices_to_take] # [n_grasps]
+        reach_labels = grasp_object.reach_labels[indices_to_take]
         
         sdf_points, sdf = self.get_sdf(grasp_object)
         
@@ -240,6 +253,7 @@ class DG16MPointcloudSDFDataset(Dataset):
         gt = {
             'sdf': torch.from_numpy(sdf).float(),
             'labels': torch.from_numpy(labels).float(),
+            'reach_labels': torch.from_numpy(reach_labels).float()
         }
         
         return res, gt
