@@ -317,8 +317,8 @@ def check_one_grasp_reachabilbilty(
     return reach_label
 
 from tqdm import tqdm
-def write_grasp_reachability_labels(robot_file="dual_panda.yml",pregrasp_distance=0.08,grasp_path="/home/prabhu2004/Desktop/curobo/grasps/",
-    mesh_path="/home/prabhu2004/Desktop/curobo/meshes/",obj_name="monitor.obj",batch_size=64):
+def write_grasp_reachability_labels(robot_file="dual_panda.yml",pregrasp_distance=0.08,grasp_path="/home/prabhu2004/Desktop/curobo/grasps",
+    mesh_path="/home/prabhu2004/Desktop/curobo/meshes", reach_path="/home/prabhu2004/Desktop/curobo/reach_labels", obj_name="monitor.obj",batch_size=64):
 
     """batch_ik, gives
     - `reach_labels`
@@ -326,6 +326,8 @@ def write_grasp_reachability_labels(robot_file="dual_panda.yml",pregrasp_distanc
     - `reach_failed_indices` 
     as {object_name}_reachability.h5
     """
+
+
     obj = make_grounded_mesh(
         os.path.join(mesh_path,obj_name),
         name="object",
@@ -404,7 +406,7 @@ def write_grasp_reachability_labels(robot_file="dual_panda.yml",pregrasp_distanc
 
 
         reach_file = os.path.join(
-            grasp_path,
+            reach_path,
             f"{obj_name}_reachability.h5"
         )
 
@@ -501,9 +503,11 @@ if __name__ == "__main__":
                 reach+=1
             
         print("Reached",reach,"/",total," poses")'''
+
         mesh_path = "/home/prabhu2004/Desktop/curobo/meshes"
         grasp_path = "/home/prabhu2004/Desktop/curobo/grasps"
-
+        reach_path = "/home/prabhu2004/Desktop/curobo/reach_labels"
+        
         mesh_files = sorted(
             [
                 f for f in os.listdir(mesh_path)
@@ -537,4 +541,5 @@ if __name__ == "__main__":
                 obj_name=obj_name,
                 grasp_path=grasp_path,
                 mesh_path=mesh_path,
+                reach_path=reach_path
             )

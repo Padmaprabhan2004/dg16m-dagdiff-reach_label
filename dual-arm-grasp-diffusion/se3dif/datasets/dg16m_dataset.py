@@ -122,7 +122,7 @@ class DG16MPointcloudSDFDataset(Dataset):
         self.sdf_dir = sdf_dir
         self.single_arm = single_arm
         self.meshes_to_take = meshes_to_take     
-        self.reach_dir=""   
+        self.reach_dir=""   #update this
         # print(self.grasps_dir)
         
         # self.grasp_files = os.listdir(self.grasps_dir)
