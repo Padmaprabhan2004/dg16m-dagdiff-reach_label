@@ -68,7 +68,27 @@ def transform_grasp_to_world(T_world_obj, grasp, pregrasp_distance=0.0, approach
 
 
 def build_dual_arm_goal(ik, left_T_world, right_T_world):
-    #use ee_link,ee_link1
+    #fk
+    current=ik.compute_kinematics(ik.default_joint_state).tool_poses
+    
+    #ee links
+    ee_link_pos= current["ee_link"].position[0].detach().cpu().numpy()
+    ee_link_1_pos = current["ee_link_1"].position[0].detach().cpu().numpy()
+
+    #grasp pos
+    left_pos = np.asarray(left_T_world[:3, 3], dtype=np.float32)
+    right_pos = np.asarray(right_T_world[:3, 3], dtype=np.float32)
+
+    direct_cost = np.linalg.norm(ee_link_pos - right_pos) + np.linalg.norm(
+        ee_link_1_pos - left_pos
+    )
+    swapped_cost = np.linalg.norm(ee_link_pos - left_pos) + np.linalg.norm(
+        ee_link_1_pos - right_pos
+    )
+    #Swap if the its exchanged
+    if swapped_cost < direct_cost:
+        left_T_world, right_T_world = right_T_world, left_T_world
+
     goal_dict = {
         "ee_link": matrix_to_pose(right_T_world),
         "ee_link_1": matrix_to_pose(left_T_world),
@@ -81,13 +101,24 @@ def build_dual_arm_goal(ik, left_T_world, right_T_world):
 
 def build_dual_arm_goal_batch(ik, left_T_world_batch, right_T_world_batch):
     """Build a batched dual-arm goal from stacked world-frame poses."""
-    
+    current = ik.compute_kinematics(ik.default_joint_state).tool_poses
+    ee_link_pos = current["ee_link"].position
+    ee_link_1_pos = current["ee_link_1"].position
+
     left_positions = torch.tensor(
         left_T_world_batch[:, :3, 3], device="cuda", dtype=torch.float32
     )
     right_positions = torch.tensor(
         right_T_world_batch[:, :3, 3], device="cuda", dtype=torch.float32
     )
+
+    direct_cost = torch.linalg.norm(ee_link_pos - right_positions, dim=-1) + torch.linalg.norm(
+        ee_link_1_pos - left_positions, dim=-1
+    )
+    swapped_cost = torch.linalg.norm(ee_link_pos - left_positions, dim=-1) + torch.linalg.norm(
+        ee_link_1_pos - right_positions, dim=-1
+    )
+    swap_mask = swapped_cost < direct_cost
     left_quats = torch.tensor(
         np.stack(
             [trimesh.transformations.quaternion_from_matrix(m) for m in left_T_world_batch],
@@ -104,6 +135,17 @@ def build_dual_arm_goal_batch(ik, left_T_world_batch, right_T_world_batch):
         device="cuda",
         dtype=torch.float32,
     )
+    
+    if torch.any(swap_mask):
+        swap_mask_pos = swap_mask[:, None]
+        left_positions, right_positions = (
+            torch.where(swap_mask_pos, right_positions, left_positions),
+            torch.where(swap_mask_pos, left_positions, right_positions),
+        )
+        left_quats, right_quats = (
+            torch.where(swap_mask_pos, right_quats, left_quats),
+            torch.where(swap_mask_pos, left_quats, right_quats),
+        )
 
     goal_dict = {
         "ee_link": Pose(position=right_positions, quaternion=right_quats),
@@ -507,7 +549,7 @@ if __name__ == "__main__":
         mesh_path = "/home/prabhu2004/Desktop/curobo/meshes"
         grasp_path = "/home/prabhu2004/Desktop/curobo/grasps"
         reach_path = "/home/prabhu2004/Desktop/curobo/reach_labels"
-        
+
         mesh_files = sorted(
             [
                 f for f in os.listdir(mesh_path)
