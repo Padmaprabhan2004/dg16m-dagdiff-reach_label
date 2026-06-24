@@ -25,7 +25,7 @@ def make_grounded_mesh(file_path, name="object", x=0.0, y=0.7, z_floor=0.0):
 
     return Mesh(
         name=name,
-        pose=[float(x), float(y) + 0.002, z_offset, 1, 0, 0, 0],
+        pose=[float(x),-0.3, z_offset, 1, 0, 0, 0],
         file_path=file_path,
     )
 
@@ -506,6 +506,9 @@ import argparse
 #|
 #dual_panda.yml is has negligible collision sphere radius for the gripper,
 #dual_panda_full_coll_sphere.yml is complete dual_panda
+#|
+#|
+#dual_panda_sideway.yml is for sideway lifted setup
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -513,7 +516,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--robot_file",
         type=str,
-        default="dual_panda.yml",
+        default="dual_panda_sideway.yml",
         help="path to robot configuration file."
     )
 

@@ -3,6 +3,7 @@ python -m curobo.examples.getting_started.build_robot_model     --urdf curobo/co
 
 
 
+
 # For computing reachability labels:
 Store meshes and grasps in meshes/ and grasps/
 python grasp_reachability_label.py --pregrasp_distance 0.08

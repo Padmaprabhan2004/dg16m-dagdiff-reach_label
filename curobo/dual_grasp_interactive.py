@@ -17,7 +17,7 @@ import trimesh
 
 
 
-
+#change the x,y of the mesh as per embodiment config, setup.
 def make_grounded_mesh(file_path, name="object", x=0.0, y=0.7, z_floor=0.0):
     mesh =trimesh.load(file_path, force="mesh", process=False)
     if isinstance(mesh, trimesh.Scene):
@@ -25,12 +25,12 @@ def make_grounded_mesh(file_path, name="object", x=0.0, y=0.7, z_floor=0.0):
     z_offset = float(-mesh.bounds[0, 2] + z_floor)
     return Mesh(
         name=name,
-        pose=[float(x), float(y)+0.1, z_offset, 1,0,0,0], #0.2 offset form the arms
+        pose=[float(x), float(y)-0.25, z_offset, 1,0,0,0], #0.2 offset form the arms
         file_path=file_path,
     )
 
 #impt function
-def interactive_ik_example(robot_file="dual_panda.yml", port=8080):
+def interactive_ik_example(robot_file="dual_panda_sideway.yml", port=8080):
     """Launch an interactive dual-arm IK viewer."""
     import time
 
@@ -52,7 +52,7 @@ def interactive_ik_example(robot_file="dual_panda.yml", port=8080):
         "/home/prabhu2004/Desktop/curobo/meshes/monitor.obj",
         name="object",
         x=0.0,
-        y=0.7,
+        y=0.0,
         z_floor=0.0,
     )
     scene_cfg = SceneCfg(mesh=[obj])
