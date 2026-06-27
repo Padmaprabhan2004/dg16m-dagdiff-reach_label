@@ -576,6 +576,19 @@ if __name__ == "__main__":
                 )
                 continue
 
+            obj_id = os.path.splitext(obj_name)[0]
+
+            reach_file = os.path.join(
+                reach_path,
+                f"{obj_id}_reachability.h5"
+            )
+
+            if os.path.exists(reach_file):
+                print(f"[SKIPPED] {obj_name}")
+                continue
+
+
+            
             print("\n" + "=" * 80)
             print(f"Processing: {obj_name}")
             print("=" * 80)
