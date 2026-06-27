@@ -24,13 +24,13 @@
     <joint name="base_joint" type="fixed">
     <parent link="base_fixture_link"/>
     <child link="base_link"/>
-    <origin xyz="0.0 -0.6 0.0"
+    <origin xyz="0.0 -0.7 0.0"
             rpy="0 0 0"/>
     </joint>
 
 
   <joint name="panda_fixed" type="fixed">
-    <origin rpy="0 0 0.0" xyz="0 0 0.0"/>
+    <origin rpy="0 0 2" xyz="0 0 0.0"/>
     <parent link="base_link"/>
     <child link="panda_link0"/>
     <axis xyz="0 0 0"/>
@@ -352,7 +352,7 @@
     <joint name="base_joint_1" type="fixed">
     <parent link="base_fixture_link"/>
     <child link="base_link_1"/>
-    <origin xyz="0.0 0.6 0.0"
+    <origin xyz="0.0 0.7 0.0"
             rpy="0 0 0"/>
     </joint>
   <link name="base_link_1"/>
@@ -360,7 +360,7 @@
 
 
   <joint name="panda_fixed_1" type="fixed">
-    <origin rpy="0 0 0.0" xyz="0 0 0.0"/>
+    <origin rpy="0 0 -2" xyz="0 0 0.0"/>
     <parent link="base_link_1"/>
     <child link="panda_link0_1"/>
     <axis xyz="0 0 0"/>
