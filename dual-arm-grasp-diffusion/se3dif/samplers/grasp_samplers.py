@@ -189,7 +189,6 @@ class DualGrasp_AnnealedLD():
             trj_H = [Ht.detach().clone()]
             energies = []
             force_closures = []
-            reach_labels = []
             collisions = []
 
         for t in tqdm(range(self.T), desc='Langevin Dynamics Steps'):
@@ -198,8 +197,6 @@ class DualGrasp_AnnealedLD():
                 trj_H.append(Ht.detach().clone())
                 energies.append(e.detach().clone())
                 force_closures.append(fc.detach().clone())
-                if hasattr(self.model, "reach_label") and self.model.reach_label is not None:
-                    reach_labels.append(self.model.reach_label.detach().clone())
 
         for t in tqdm(range(self.T_fit), desc='Fitting Steps'):
             Ht, tt, e, fc = self._step(Ht, self.T, noise_off=True, dual=dual, refine=False)
@@ -207,16 +204,16 @@ class DualGrasp_AnnealedLD():
                 trj_H.append(Ht.detach().clone())
                 energies.append(e.detach().clone())
                 force_closures.append(fc.detach().clone())
-                if hasattr(self.model, "reach_label") and self.model.reach_label is not None:
-                    reach_labels.append(self.model.reach_label.detach().clone())
 
         for t in tqdm(range(100), desc='Refining Steps'):
             Ht, tt, coll = self._step(Ht, self.T, noise_off=True, dual=dual, refine=True, refine_step=t)
             if save_path:
                 trj_H.append(Ht.detach().clone())
                 collisions.append(coll.detach().clone())
-                if hasattr(self.model, "reach_label") and self.model.reach_label is not None:
-                    reach_labels.append(self.model.reach_label.detach().clone())
+
+        reach_labels = None
+        if hasattr(self.model, "reach_label") and self.model.reach_label is not None:
+            reach_labels = self.model.reach_label.detach().clone()
 
         if save_path:
             return (
@@ -225,7 +222,7 @@ class DualGrasp_AnnealedLD():
                 tt,
                 torch.stack(energies),
                 torch.stack(force_closures),
-                torch.stack(reach_labels) if len(reach_labels) > 0 else None,
+                reach_labels,
                 torch.stack(collisions),
             )
         else:

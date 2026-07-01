@@ -6,7 +6,7 @@ import numpy as np
 from se3dif import models
 
 from se3dif.utils import get_pretrained_models_src, load_experiment_specifications
-pretrained_models_dir = get_pretrained_models_src()
+#pretrained_models_dir = get_pretrained_models_src()
 
 def load_model(args):
     if 'pretrained_model' in args:
