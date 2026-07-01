@@ -142,13 +142,14 @@ def main(get_args=True, input_dict=None):
     dual = True
     # model.eval()
     save_path = True
+    reach_labels = None
     if save_path:
         if args.debug_mode:
             print('*************** Debug mode ***************')
             H_, traj, t = generator.sample_debug(dual=dual, save_path=save_path)
         else:
             # H_, traj, t = generator.sample(dual=dual, save_path=save_path)
-            H_, traj, t, energies, force_closures, collisions = generator.sample(dual=dual, save_path=save_path)
+            H_, traj, t, energies, force_closures, reach_labels, collisions = generator.sample(dual=dual, save_path=save_path)
     else:
         H_, t = generator.sample(dual=dual, save_path=save_path)
 
@@ -173,6 +174,8 @@ def main(get_args=True, input_dict=None):
     torch.save(e, './temp/output_energy.pt')
     torch.save(traj.detach().cpu().numpy(), './temp/grasps_traj.pt')
     torch.save(model.pred_label.detach().cpu().numpy(), './temp/grasp_scores.pt')
+    if reach_labels is not None:
+        torch.save(reach_labels.detach().cpu().numpy(), './temp/reach_label_scores.pt')
     torch.save(P, './temp/point_cloud.pt')
     torch.save(model.collision_pred.detach().cpu().numpy(), './temp/collision_scores.pt')
     torch.save(rot, './temp/rotation.pt')
