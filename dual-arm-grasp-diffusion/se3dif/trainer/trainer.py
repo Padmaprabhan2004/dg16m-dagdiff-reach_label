@@ -110,7 +110,7 @@ def train(model, train_dataloader, epochs, steps_til_summary, epochs_til_checkpo
 
                 total_loss = 0.0
                 for name, loss in losses.items():
-                    if "Accuracy" in name:
+                    if any(metric in name for metric in ["Accuracy", "F1"]):
                         tracker.update({name: loss})
                         continue
 
@@ -175,7 +175,7 @@ def train(model, train_dataloader, epochs, steps_til_summary, epochs_til_checkpo
                             losses, _ = loss_fn(model, model_input, gt)
 
                         for name, loss in losses.items():
-                            if "Accuracy" in name:
+                            if any(metric in name for metric in ["Accuracy", "F1"]):
                                 val_tracker.update({name: loss})
                                 continue
                             val_tracker.update({name: loss.mean().item()})

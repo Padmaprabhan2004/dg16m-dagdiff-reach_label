@@ -154,8 +154,7 @@ def load_dual_arm_pointcloud_grasp_diffusion_occupancy_encoder(args, inference=F
         nn.Linear(hidden_dim // 4, hidden_dim//8, bias=False),
         nn.LayerNorm(hidden_dim//8),
         nn.ELU(),
-        nn.Linear(hidden_dim//8, 1),
-        nn.Sigmoid()
+        nn.Linear(hidden_dim//8, 1)#logits
     )
 
 

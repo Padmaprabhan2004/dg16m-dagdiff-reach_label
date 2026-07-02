@@ -211,9 +211,11 @@ class DualGrasp_AnnealedLD():
                 trj_H.append(Ht.detach().clone())
                 collisions.append(coll.detach().clone())
 
-        reach_labels = None
-        if hasattr(self.model, "reach_label") and self.model.reach_label is not None:
-            reach_labels = self.model.reach_label.detach().clone()
+        final_reach_label = None
+        if hasattr(self.model, "reachability_classifier") and self.model.reachability_classifier is not None:
+            with torch.no_grad():
+                _ = self.model(Ht, tt, batch=1, dual=dual)
+            final_reach_label = self.model.reach_label.detach().clone()
 
         if save_path:
             return (
@@ -222,7 +224,7 @@ class DualGrasp_AnnealedLD():
                 tt,
                 torch.stack(energies),
                 torch.stack(force_closures),
-                reach_labels,
+                final_reach_label,
                 torch.stack(collisions),
             )
         else:
