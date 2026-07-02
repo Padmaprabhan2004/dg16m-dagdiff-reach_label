@@ -61,12 +61,7 @@ class DG16MGrasps:
             np.ones(positive_grasps.shape[0], dtype=np.float32),
             np.zeros(negative_grasps.shape[0], dtype=np.float32)
         ))
-        # singlearm collision training does not use reachability supervision,
-        # but keep the field defined so the dataset object stays consistent.
-        self.reach_labels = np.ones(
-            positive_grasps.shape[0] + negative_grasps.shape[0],
-            dtype=np.float32
-        )
+        self.reach_labels = np.ones(len(grasps), dtype=np.float32)
         # print(f'Loaded {positive_grasps.shape} positive grasps and {negative_grasps.shape} negative grasps for {mesh_name}')
         grasps = np.concatenate((positive_grasps, negative_grasps), axis=0)
         
@@ -127,7 +122,7 @@ class DG16MPointcloudSDFDataset(Dataset):
         self.sdf_dir = sdf_dir
         self.single_arm = single_arm
         self.meshes_to_take = meshes_to_take     
-        self.reach_dir=""   #update this
+        self.reach_dir="/scratch/dualarm/DG16M/dg16m/reach_labels"
         # print(self.grasps_dir)
         
         # self.grasp_files = os.listdir(self.grasps_dir)

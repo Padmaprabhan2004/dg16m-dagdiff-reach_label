@@ -1,14 +1,13 @@
 Description: "Configuration file for dual arm grasp diffusion model training and inference."
 
-exp_log_dir: "./experiments_jul/temp/"
+exp_log_dir: "./experiments_jun/temp/"
 
 seed: 56
-#need to change this
 grasps_dir: '/scratch/dualarm/DG16M/dg16m/grasps'
 meshes_dir: '/scratch/dualarm/DA2_15mar/meshes'
 sdf_dir: '/scratch/dualarm/DA2_15mar/sdf'
-train_meshes_list: /scratch/dualarm/DG16M/train_final.txt
-val_meshes_list: /scratch/dualarm/DG16M/test_final.txt
+train_meshes_list: /home/dualarm/dummyhome/dg16m-dagdiff-reach_label/train_final.txt
+val_meshes_list: /home/dualarm/dummyhome/dg16m-dagdiff-reach_label/test_final.txt
 
 single_object: false
 
@@ -16,13 +15,12 @@ classifier_path: null
 use_attention: False
 use_wandb: False
 num_input_points: 1000
-num_input_grasps: 64
+num_input_grasps: 32
 learning_rate: 0.0001
 unet: unet
 single_arm: False
 
 inference_checkpoint: ./checkpoint/model_epoch_0999_iter_001997.pth
-
 TrainSpecs:
   batch_size: 8
   num_epochs: 1000
@@ -66,7 +64,7 @@ NetworkSpecs:
 
   pretrained_checkpoint: 
     path: ./checkpoint/model_epoch_0359_iter_211091.pth
-    to_load: ['all'] # or ['none', 'vision_encoder', 'feature_encoder', 'dual_energy_net', 'classifier', 'collision_predictor']
+    to_load: ['none'] # or ['none', 'vision_encoder', 'feature_encoder', 'dual_energy_net', 'classifier', 'collision_predictor']
 
 Losses:
   - "sdf_loss"

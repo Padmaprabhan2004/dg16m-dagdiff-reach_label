@@ -6,18 +6,20 @@ import numpy as np
 from se3dif import models
 
 from se3dif.utils import get_pretrained_models_src, load_experiment_specifications
-#pretrained_models_dir = get_pretrained_models_src()
+pretrained_models_dir = get_pretrained_models_src()
 
 def load_model(args):
     if 'pretrained_model' in args:
+        
         model_args = load_experiment_specifications('./configs/',
                                                     load_yaml=args['pretrained_model'])
+        
         args['classifier_path'] = model_args['classifier_path']      
         args["NetworkArch"] = model_args["NetworkArch"]
         args["NetworkSpecs"] = model_args["NetworkSpecs"]
         args['use_attention'] = model_args['use_attention']
         args['inference_checkpoint'] = model_args['inference_checkpoint']
-
+        
 
     if args['NetworkArch'] == 'DualGraspDiffusionConv':
         model = load_dual_arm_pointcloud_grasp_diffusion_occupancy_encoder(args, inference='pretrained_model' in args)

@@ -21,7 +21,7 @@ def main():
     mesh_files = open(TEST_MESHES, 'r').readlines()
     mesh_files = [line.strip() for line in mesh_files if line.strip()]
     random.shuffle(mesh_files)
-    #mesh_files = mesh_files[:50]
+    mesh_files = mesh_files[:50]
     
     for mesh_name in tqdm(mesh_files, colour='blue'):
         mesh_name = os.path.join('/scratch/dualarm/DA2_15mar/meshes_scaled/', mesh_name)

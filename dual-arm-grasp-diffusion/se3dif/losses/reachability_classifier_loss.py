@@ -52,3 +52,4 @@ class ReachabilityClassifierLoss():
                      'Reachability F1': f1.item()}
         
         return loss_dict, info
+
